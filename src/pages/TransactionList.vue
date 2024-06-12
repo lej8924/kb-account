@@ -1,5 +1,5 @@
 <template>
-  <link href="/docs/5.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+  <!-- <link href="/docs/5.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous"> -->
 
   <br>
   <div class="list-header" style="width: 80%; margin: 0 auto;">
@@ -11,11 +11,23 @@
   <br>
   <div class="list-header-right d-flex align-items-center">
     <div class="d-flex align-items-center me-1">
-      <input class="form-check-input me-1" type="checkbox" value="" id="flexCheckDefault">
+      <input
+        class="form-check-input me-1"
+        type="checkbox"
+        :checked="isIncomeChecked"
+        @change="handleIncomeCheckboxChange"
+        id="incomeBox"
+      />
       <p class="list-header-money mb-0 me-1">수입 {{formatNumber(totalIncome)}}</p>
     </div>
     <div class="d-flex align-items-center me-1">
-      <input class="form-check-input me-1" type="checkbox" value="" id="flexCheckDefault">
+      <input
+        class="form-check-input me-1"
+        type="checkbox"
+        :checked="isPayChecked"
+        @change="handlePayCheckboxChange"
+        id="payBox"
+      />
       <p class="list-header-money mb-0" style="color: #e139c2">지출 {{formatNumber(totalPay)}}</p>
     </div>
   </div>
@@ -25,7 +37,7 @@
   </div>
 
 <div class="day-list">
-  <div v-for="(item, date) in groupedTransactions" :key="date" class="day-list-item">
+  <div v-for="(item, date) in filteredTransactions" :key="date" class="day-list-item">
     <div class="day-list-header">
       <p class="day-list-date">{{ date }}</p>
       <div class="day-list-totals">
@@ -34,38 +46,111 @@
       </div>
     </div>
     <div class="transaction-list">
-      <TransactionItem v-for="transaction in item.transactions" :key="transaction.id" :transactionItem="transaction" />
+      <TransactionItem v-for="transaction in item.total" @click="showModal(transaction)" :key="transaction.id" :transactionItem="transaction"  />
     </div>
   </div>
 </div>
 
+
+<TransactionEditModal v-if="selectedTransaction != null" :show="showTransactionModal" :transactionItem="selectedTransaction" @sendClose="closeModal" />
+
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useTransactionStore } from '@/stores/transactions.js';
 import TransactionItem from '@/pages/TransactionItem.vue';
+import TransactionEditModal from '@/components/TransactionEditModal.vue';
+
+let showTransactionModal = ref(false);
+let selectedTransaction = ref(null);
+
+const showModal = (transactionData) => {
+  if (transactionData) {
+    selectedTransaction.value = { ...transactionData };
+    showTransactionModal.value = true;
+  }
+};
+const closeModal = () => {
+  showTransactionModal.value = false;
+  selectedTransaction.value = null;
+};
+
+const isIncomeChecked = ref(true);
+const isPayChecked = ref(true);
 
 const transactionStore = useTransactionStore();
 
 const transactionList = computed(() => transactionStore.transactionList);
-console.log(transactionList);
+
 
 const totalIncome = computed(() => calculateTotalIncome(transactionStore.transactionList));
 const totalPay = computed(() => calculateTotalPay(transactionStore.transactionList));
+
+const handleIncomeCheckboxChange = () => {
+  isIncomeChecked.value = !isIncomeChecked.value;
+
+};
+
+const handlePayCheckboxChange = () => {
+  isPayChecked.value = !isPayChecked.value;
+
+};
 
 const groupedTransactions = computed(() => {
   const groups = groupByDate(transactionList.value);
   const dailyTotals = calculateDailyTotals(transactionList.value);
   return Object.keys(groups).reduce((sorted, date) => {
     sorted[date] = {
-      transactions: groups[date],
+      total: groups[date],
+      income: groups[date].filter((t) => t.type === 'Income'),
+      pay: groups[date].filter((t) => t.type === 'Pay'),
       totalIncome: dailyTotals[date]?.income || 0,
       totalPay: dailyTotals[date]?.pay || 0,
     };
     return sorted;
   }, {});
 });
+
+const filteredTransactions = computed(() => {
+  return computeFilteredTransactions(
+    groupedTransactions.value,
+    isIncomeChecked.value,
+    isPayChecked.value
+  );
+});
+
+watch([isIncomeChecked, isPayChecked], () => {
+  filteredTransactions.value = computeFilteredTransactions(
+    groupedTransactions.value,
+    isIncomeChecked.value,
+    isPayChecked.value
+  );
+});
+
+function computeFilteredTransactions(groupedTransactions, isIncomeChecked, isPayChecked) {
+  if (isIncomeChecked === true && isPayChecked === true) {
+    return groupedTransactions;
+  } else if (isIncomeChecked === true) {
+    return Object.keys(groupedTransactions).reduce((filtered, date) => {
+      filtered[date] = {
+        ...groupedTransactions[date],
+        total: groupedTransactions[date].income,
+      };
+      return filtered;
+    }, {});
+  } else if (isPayChecked === true) {
+    return Object.keys(groupedTransactions).reduce((filtered, date) => {
+      filtered[date] = {
+        ...groupedTransactions[date],
+        total: groupedTransactions[date].pay,
+      };
+      return filtered;
+    }, {});
+  } else {
+    return {};
+  }
+}
 
 const sortedGroups = Object.keys(groupedTransactions)
   .sort((a, b) => new Date(b) - new Date(a))
