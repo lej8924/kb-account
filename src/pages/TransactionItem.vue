@@ -9,7 +9,7 @@
   </div> -->
  
   <div class="list-group border-0 mx-auto" style="width: 100%;">
-  <a href="#" class="list-group-item list-group-item-action d-flex gap-3 py-2 border-0" aria-current="true">
+  <a class="list-group-item list-group-item-action d-flex gap-3 py-2 border-0" aria-current="true">
     <div class="d-flex gap-3 w-100 justify-content-between align-items-center">
       <div class="d-flex align-items-center flex-grow-1">
         <span class="badge rounded-pill text-white px-3 py-2 me-3" :style="{ backgroundColor: getCategoryColor(transactionItem.category), width: '120px', 'text-align': 'center' }">
