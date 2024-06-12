@@ -1,59 +1,52 @@
 <template>
-  <!-- <link href="/docs/5.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous"> -->
-
   <br>
   <div class="list-header" style="width: 80%; margin: 0 auto;">
-  <div class="list-header-left d-flex align-items-center">
-    <p class="list-header-total mb-0 me-4 fs-3">전체 내역 {{ transactionList.length }}건</p>
-  </div>
-  <br>
-  <br>
-  <br>
-  <div class="list-header-right d-flex align-items-center">
-    <div class="d-flex align-items-center me-1">
-      <input
-        class="form-check-input me-1"
-        type="checkbox"
-        :checked="isIncomeChecked"
-        @change="handleIncomeCheckboxChange"
-        id="incomeBox"
-      />
-      <p class="list-header-money mb-0 me-1">수입 {{formatNumber(totalIncome)}}</p>
+    <div class="list-header-left d-flex align-items-center">
+      <p class="list-header-total mb-0 me-4 fs-3">전체 내역 {{ filteredTransactionList.length }}건</p>
     </div>
-    <div class="d-flex align-items-center me-1">
-      <input
-        class="form-check-input me-1"
-        type="checkbox"
-        :checked="isPayChecked"
-        @change="handlePayCheckboxChange"
-        id="payBox"
-      />
-      <p class="list-header-money mb-0" style="color: #e139c2">지출 {{formatNumber(totalPay)}}</p>
-    </div>
-  </div>
-</div>
-
-  <div class="day-list">
-  </div>
-
-<div class="day-list">
-  <div v-for="(item, date) in filteredTransactions" :key="date" class="day-list-item">
-    <div class="day-list-header">
-      <p class="day-list-date">{{ date }}</p>
-      <div class="day-list-totals">
-        <p>수입 {{ formatNumber(item.totalIncome) }}</p>
-        <p>지출 {{ formatNumber(item.totalPay) }}</p>
+    <br>
+    <br>
+    <br>
+    <div class="list-header-right d-flex align-items-center">
+      <div class="d-flex align-items-center me-1">
+        <input
+          class="form-check-input me-1"
+          type="checkbox"
+          :checked="isIncomeChecked"
+          @change="handleIncomeCheckboxChange"
+          id="incomeBox"
+        />
+        <p class="list-header-money mb-0 me-1">수입 {{ formatNumber(totalIncome) }}</p>
+      </div>
+      <div class="d-flex align-items-center me-1">
+        <input
+          class="form-check-input me-1"
+          type="checkbox"
+          :checked="isPayChecked"
+          @change="handlePayCheckboxChange"
+          id="payBox"
+        />
+        <p class="list-header-money mb-0" style="color: #e139c2">지출 {{ formatNumber(totalPay) }}</p>
       </div>
     </div>
-    <div class="transaction-list">
-      <TransactionItem v-for="transaction in item.total" @click="showModal(transaction)" :key="transaction.id" :transactionItem="transaction"  />
+  </div>
+
+  <div class="day-list">
+    <div v-for="(item, date) in filteredTransactions" :key="date" class="day-list-item">
+      <div class="day-list-header">
+        <p class="day-list-date">{{ date }}</p>
+        <div class="day-list-totals">
+          <p>수입 {{ formatNumber(item.totalIncome) }}</p>
+          <p>지출 {{ formatNumber(item.totalPay) }}</p>
+        </div>
+      </div>
+      <div class="transaction-list">
+        <TransactionItem v-for="transaction in item.total" @click="showModal(transaction)" :key="transaction.id" :transactionItem="transaction" />
+      </div>
     </div>
   </div>
-</div>
 
-
-<TransactionEditModal v-if="selectedTransaction != null" :show="showTransactionModal" :transactionItem="selectedTransaction" @sendClose="closeModal" />
-
+  <TransactionEditModal v-if="selectedTransaction != null" :show="showTransactionModal" :transactionItem="selectedTransaction" @sendClose="closeModal" />
 </template>
 
 <script setup>
@@ -61,6 +54,9 @@ import { computed, ref, watch } from 'vue';
 import { useTransactionStore } from '@/stores/transactions.js';
 import TransactionItem from '@/pages/TransactionItem.vue';
 import TransactionEditModal from '@/components/TransactionEditModal.vue';
+
+const transactionStore = useTransactionStore();
+const transactionList = computed(() => transactionStore.transactionList);
 
 let showTransactionModal = ref(false);
 let selectedTransaction = ref(null);
@@ -71,6 +67,7 @@ const showModal = (transactionData) => {
     showTransactionModal.value = true;
   }
 };
+
 const closeModal = () => {
   showTransactionModal.value = false;
   selectedTransaction.value = null;
@@ -79,27 +76,58 @@ const closeModal = () => {
 const isIncomeChecked = ref(true);
 const isPayChecked = ref(true);
 
-const transactionStore = useTransactionStore();
-
-const transactionList = computed(() => transactionStore.transactionList);
-
-
-const totalIncome = computed(() => calculateTotalIncome(transactionStore.transactionList));
-const totalPay = computed(() => calculateTotalPay(transactionStore.transactionList));
-
 const handleIncomeCheckboxChange = () => {
   isIncomeChecked.value = !isIncomeChecked.value;
-
 };
 
 const handlePayCheckboxChange = () => {
   isPayChecked.value = !isPayChecked.value;
-
 };
 
+const selectedCategories = ref([]);
+const selectedDelivery = ref('');
+const selectedPriceRange = ref([0, 1000000]);
+
+// 카테고리 필터 이벤트 처리
+const filterCategory = (categories) => {
+  selectedCategories.value = categories;
+};
+
+// 입출금 필터 이벤트 처리
+const filterDelivery = (delivery) => {
+  selectedDelivery.value = delivery;
+};
+
+// 금액 범위 필터 이벤트 처리
+const filterPriceRange = (range) => {
+  selectedPriceRange.value = range;
+};
+
+// 필터링된 거래 목록을 계산
+const filteredTransactionList = computed(() => {
+  let filtered = transactionList.value;
+  if (selectedCategories.value.length) {
+    filtered = filtered.filter(transaction => selectedCategories.value.includes(transaction.category));
+  }
+  if (selectedDelivery.value) {
+    filtered = filtered.filter(transaction => transaction.type === selectedDelivery.value);
+  }
+  if (selectedPriceRange.value) {
+    filtered = filtered.filter(transaction => parseFloat(transaction.price) >= selectedPriceRange.value[0] && parseFloat(transaction.price) <= selectedPriceRange.value[1]);
+  }
+  return filtered;
+});
+
+// 필터링된 거래 목록의 총 수입 계산
+const totalIncome = computed(() => calculateTotalIncome(filteredTransactionList.value));
+
+// 필터링된 거래 목록의 총 지출 계산
+const totalPay = computed(() => calculateTotalPay(filteredTransactionList.value));
+
+// 거래 목록을 날짜별로 그룹화
 const groupedTransactions = computed(() => {
-  const groups = groupByDate(transactionList.value);
-  const dailyTotals = calculateDailyTotals(transactionList.value);
+  const groups = groupByDate(filteredTransactionList.value);
+  const dailyTotals = calculateDailyTotals(filteredTransactionList.value);
   return Object.keys(groups).reduce((sorted, date) => {
     sorted[date] = {
       total: groups[date],
@@ -152,6 +180,7 @@ function computeFilteredTransactions(groupedTransactions, isIncomeChecked, isPay
   }
 }
 
+// 그룹화된 거래 목록을 정렬
 const sortedGroups = Object.keys(groupedTransactions)
   .sort((a, b) => new Date(b) - new Date(a))
   .reduce((sorted, date) => {
@@ -159,35 +188,34 @@ const sortedGroups = Object.keys(groupedTransactions)
     return sorted;
   }, {});
 
-
+// 총 수입 계산 함수
 function calculateTotalIncome(transactions) {
   let totalIncome = 0;
-
   for (let i = 0; i < transactions.length; i++) {
     if (transactions[i].type === "Income") {
       totalIncome += parseFloat(transactions[i].price);
     }
   }
-
   return totalIncome;
 }
 
+// 총 지출 계산 함수
 function calculateTotalPay(transactions) {
   let totalPay = 0;
-
   for (let i = 0; i < transactions.length; i++) {
     if (transactions[i].type === "Pay") {
       totalPay += parseFloat(transactions[i].price);
     }
   }
-
   return totalPay;
 }
 
+// 숫자를 형식화하는 함수 추가
 function formatNumber(value) {
   return value.toLocaleString();
 }
 
+// 거래 목록을 날짜별로 그룹화하는 함수
 function groupByDate(transactionList) {
   return transactionList.reduce((groups, transaction) => {
     const date = new Date(transaction.date).toLocaleDateString('ko-KR');
@@ -198,6 +226,8 @@ function groupByDate(transactionList) {
     return groups;
   }, {});
 }
+
+// 일별 총 수입 및 지출을 계산하는 함수
 function calculateDailyTotals(transactions) {
   return transactions.reduce((dailyTotals, transaction) => {
     const date = new Date(transaction.date).toLocaleDateString('ko-KR');
@@ -212,7 +242,6 @@ function calculateDailyTotals(transactions) {
     return dailyTotals;
   }, {});
 }
-
 </script>
 
 <style scoped>
@@ -244,12 +273,10 @@ function calculateDailyTotals(transactions) {
   font-weight: bold;
 }
 
-
 .list-header-total {
   margin: 0 10px;
   font-size: 100px;
 }
-
 
 .list-header-money {
   margin: 0 10px;
@@ -266,7 +293,7 @@ function calculateDailyTotals(transactions) {
   flex-direction: column;
   border-bottom: 1px solid #e0e0e0;
   padding: 12px 0;
-  width: 70%;
+  width: 100%;
 }
 
 .day-list-header {
@@ -280,7 +307,6 @@ function calculateDailyTotals(transactions) {
 .day-list-date {
   font-size: 20px;
   font-weight: bold;
-  /* margin-left: 200px; */
 }
 
 .day-list-totals {
@@ -290,7 +316,6 @@ function calculateDailyTotals(transactions) {
   font-size: 16px;
   width: 30%;
   justify-content: flex-end;
-  /* margin-right: 200px; */
 }
 
 .day-list-totals > * {
@@ -309,5 +334,4 @@ function calculateDailyTotals(transactions) {
   flex-direction: column;
   gap: 0px;
 }
-
 </style>
